@@ -692,14 +692,19 @@ Utility::PreparedLocalReplyPtr Utility::prepareLocalReply(const EncodeFunctions&
     response_headers->setStatus(std::to_string(enumToInt(Code::OK)));
     response_headers->setReferenceContentType(Headers::get().ContentTypeValues.Grpc);
 
-    if (response_headers->getGrpcStatusValue().empty()) {
-      response_headers->setGrpcStatus(std::to_string(
-          enumToInt(local_reply_data.grpc_status_
-                        ? local_reply_data.grpc_status_.value()
-                        : Grpc::Utility::httpToGrpcStatus(enumToInt(response_code)))));
-    }
+    auto response_trailer = ResponseTrailerMapImpl::create();
+    auto grpc_status = enumToInt(
+        local_reply_data.grpc_status_ ? local_reply_data.grpc_status_.value()
+                                      : Grpc::Utility::httpToGrpcStatus(enumToInt(response_code)));
+    response_trailer->addReferenceKey(LowerCaseString("grpc-status"), std::to_string(grpc_status));
+    // if (response_headers->getGrpcStatusValue().empty()) {
+    //   response_headers->setGrpcStatus(std::to_string(
+    //       enumToInt(local_reply_data.grpc_status_
+    //                     ? local_reply_data.grpc_status_.value()
+    //                     : Grpc::Utility::httpToGrpcStatus(enumToInt(response_code)))));
+    // }
 
-    if (!body_text.empty() && !local_reply_data.is_head_request_) {
+    if (!body_text.empty() && !local_reply_data.is_head_request_ && grpc_status != 0) {
       // TODO(dio): Probably it is worth to consider caching the encoded message based on gRPC
       // status.
       // JsonFormatter adds a '\n' at the end. For header value, it should be removed.
@@ -708,7 +713,9 @@ Utility::PreparedLocalReplyPtr Utility::prepareLocalReply(const EncodeFunctions&
           body_text[body_text.length() - 1] == '\n') {
         body_text = body_text.substr(0, body_text.length() - 1);
       }
-      response_headers->setGrpcMessage(PercentEncoding::encode(body_text));
+      response_trailer->addReferenceKey(LowerCaseString("grpc-message"),
+                                        PercentEncoding::encode(body_text));
+      // response_headers->setGrpcMessage(PercentEncoding::encode(body_text));
     }
     // The `modify_headers` function may have added content-length, remove it.
     response_headers->removeContentLength();
@@ -718,7 +725,8 @@ Utility::PreparedLocalReplyPtr Utility::prepareLocalReply(const EncodeFunctions&
     // NOLINTNEXTLINE(modernize-make-unique)
     return PreparedLocalReplyPtr(new PreparedLocalReply{
         local_reply_data.is_grpc_, local_reply_data.is_head_request_, std::move(response_headers),
-        std::move(body_text), encode_functions.encode_headers_, encode_functions.encode_data_});
+        std::move(body_text), std::move(response_trailer), encode_functions.encode_headers_,
+        encode_functions.encode_data_, encode_functions.encode_trailers_});
   }
 
   if (!body_text.empty()) {
@@ -740,7 +748,8 @@ Utility::PreparedLocalReplyPtr Utility::prepareLocalReply(const EncodeFunctions&
   // NOLINTNEXTLINE(modernize-make-unique)
   return PreparedLocalReplyPtr(new PreparedLocalReply{
       local_reply_data.is_grpc_, local_reply_data.is_head_request_, std::move(response_headers),
-      std::move(body_text), encode_functions.encode_headers_, encode_functions.encode_data_});
+      std::move(body_text), nullptr, encode_functions.encode_headers_,
+      encode_functions.encode_data_, nullptr});
 }
 
 void Utility::encodeLocalReply(const bool& is_reset, PreparedLocalReplyPtr prepared_local_reply) {
@@ -749,7 +758,11 @@ void Utility::encodeLocalReply(const bool& is_reset, PreparedLocalReplyPtr prepa
 
   if (prepared_local_reply->is_grpc_request_) {
     // Trailers only response
-    prepared_local_reply->encode_headers_(std::move(response_headers), true);
+    prepared_local_reply->encode_headers_(std::move(response_headers), false);
+    Buffer::OwnedImpl buffer(prepared_local_reply->response_body_);
+    prepared_local_reply->encode_data_(buffer, false);
+    ResponseTrailerMapPtr response_tailers{std::move(prepared_local_reply->response_trailers_)};
+    prepared_local_reply->encode_trailers_(std::move(response_tailers));
     return;
   }
 

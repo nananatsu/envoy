@@ -1057,7 +1057,12 @@ void DownstreamFilterManager::prepareLocalReplyViaFilterChain(
           [this](Buffer::Instance& data, bool end_stream) -> void {
             encodeData(nullptr, data, end_stream,
                        FilterManager::FilterIterationStartState::CanStartFromCurrent);
-          }},
+          },
+          [this](ResponseTrailerMapPtr&& trailers) -> void {
+            filter_manager_callbacks_.setResponseTrailers(std::move(trailers));
+            encodeTrailers(nullptr, filter_manager_callbacks_.responseTrailers().ref());
+          },
+      },
       Utility::LocalReplyData{is_grpc_request, code, body, grpc_status, is_head_request});
 }
 
@@ -1104,7 +1109,8 @@ void DownstreamFilterManager::sendLocalReplyViaFilterChain(
           [this](Buffer::Instance& data, bool end_stream) -> void {
             encodeData(nullptr, data, end_stream,
                        FilterManager::FilterIterationStartState::CanStartFromCurrent);
-          }},
+          },
+          nullptr},
       Utility::LocalReplyData{is_grpc_request, code, body, grpc_status, is_head_request});
 }
 
@@ -1149,7 +1155,8 @@ void DownstreamFilterManager::sendDirectLocalReply(
               return;
             }
             maybeEndEncode(end_stream);
-          }},
+          },
+          nullptr},
       Utility::LocalReplyData{state_.is_grpc_request_, code, body, grpc_status, is_head_request});
 }
 
