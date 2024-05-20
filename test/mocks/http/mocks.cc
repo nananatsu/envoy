@@ -136,9 +136,8 @@ void MockStreamDecoderFilterCallbacks::sendLocalReply_(
             }
             encodeHeaders(std::move(headers), end_stream, details);
           },
-          [this](Buffer::Instance& data, bool end_stream) -> void {
-            encodeData(data, end_stream);
-          }},
+          [this](Buffer::Instance& data, bool end_stream) -> void { encodeData(data, end_stream); },
+          nullptr},
       Utility::LocalReplyData{is_grpc_request_, code, body, grpc_status, is_head_request_});
 }
 

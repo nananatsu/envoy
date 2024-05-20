@@ -204,7 +204,7 @@ void RouterCheckTool::sendLocalReply(ToolConfig& tool_config,
       [&](Envoy::Buffer::Instance& data, bool end_stream) -> void {
         UNREFERENCED_PARAMETER(data);
         UNREFERENCED_PARAMETER(end_stream);
-      }};
+      },nullptr};
 
   bool is_grpc = false;
   bool is_head_request = false;

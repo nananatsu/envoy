@@ -378,6 +378,8 @@ struct EncodeFunctions {
   std::function<void(ResponseHeaderMapPtr&& headers, bool end_stream)> encode_headers_;
   // Function to encode the response body.
   std::function<void(Buffer::Instance& data, bool end_stream)> encode_data_;
+  // Function to encode response trailers.
+  std::function<void(ResponseTrailerMapPtr&& trailers)> encode_trailers_;
 };
 
 struct LocalReplyData {
@@ -399,10 +401,13 @@ struct PreparedLocalReply {
   bool is_head_request_ = false;
   ResponseHeaderMapPtr response_headers_;
   std::string response_body_;
+  ResponseTrailerMapPtr response_trailers_;
   // Function to encode response headers.
   std::function<void(ResponseHeaderMapPtr&& headers, bool end_stream)> encode_headers_;
   // Function to encode the response body.
   std::function<void(Buffer::Instance& data, bool end_stream)> encode_data_;
+    // Function to encode response trailers.
+  std::function<void(ResponseTrailerMapPtr&& trailers)> encode_trailers_;
 };
 
 using PreparedLocalReplyPtr = std::unique_ptr<PreparedLocalReply>;

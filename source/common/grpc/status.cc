@@ -7,6 +7,8 @@ Status::GrpcStatus Utility::httpToGrpcStatus(uint64_t http_response_status) {
   // From
   // https://github.com/grpc/grpc/blob/master/doc/http-grpc-status-mapping.md.
   switch (http_response_status) {
+  case 200:
+    return Status::WellKnownGrpcStatus::Ok;
   case 400:
     return Status::WellKnownGrpcStatus::Internal;
   case 401:
