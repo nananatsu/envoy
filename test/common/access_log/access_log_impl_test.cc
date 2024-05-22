@@ -1296,7 +1296,7 @@ typed_config:
   // those enumerated below with a non-UNKNOWN mapping. See: //source/common/grpc/status.cc and
   // https://github.com/grpc/grpc/blob/master/doc/http-grpc-status-mapping.md.
   const std::vector<std::pair<std::string, uint64_t>> statusMapping = {
-      {"UNKNOWN", 200},           {"INTERNAL", 400},    {"UNAUTHENTICATED", 401},
+      {"OK", 200},           {"INTERNAL", 400},    {"UNAUTHENTICATED", 401},
       {"PERMISSION_DENIED", 403}, {"UNAVAILABLE", 429}, {"UNIMPLEMENTED", 404},
       {"UNAVAILABLE", 502},       {"UNAVAILABLE", 503}, {"UNAVAILABLE", 504}};
 

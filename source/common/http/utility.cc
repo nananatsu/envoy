@@ -692,30 +692,30 @@ Utility::PreparedLocalReplyPtr Utility::prepareLocalReply(const EncodeFunctions&
     response_headers->setStatus(std::to_string(enumToInt(Code::OK)));
     response_headers->setReferenceContentType(Headers::get().ContentTypeValues.Grpc);
 
-    auto response_trailer = ResponseTrailerMapImpl::create();
-    auto grpc_status = enumToInt(
-        local_reply_data.grpc_status_ ? local_reply_data.grpc_status_.value()
-                                      : Grpc::Utility::httpToGrpcStatus(enumToInt(response_code)));
-    response_trailer->addReferenceKey(LowerCaseString("grpc-status"), std::to_string(grpc_status));
-    // if (response_headers->getGrpcStatusValue().empty()) {
-    //   response_headers->setGrpcStatus(std::to_string(
-    //       enumToInt(local_reply_data.grpc_status_
-    //                     ? local_reply_data.grpc_status_.value()
-    //                     : Grpc::Utility::httpToGrpcStatus(enumToInt(response_code)))));
-    // }
+    std::unique_ptr<ResponseTrailerMapImpl> response_trailer = nullptr;
+    auto grpc_status = enumToInt(local_reply_data.grpc_status_
+                                     ? local_reply_data.grpc_status_.value()
+                                     : Grpc::Utility::httpToGrpcStatus(enumToInt(response_code)));
 
-    if (!body_text.empty() && !local_reply_data.is_head_request_ && grpc_status != 0) {
-      // TODO(dio): Probably it is worth to consider caching the encoded message based on gRPC
-      // status.
-      // JsonFormatter adds a '\n' at the end. For header value, it should be removed.
-      // https://github.com/envoyproxy/envoy/blob/main/source/common/formatter/substitution_formatter.cc#L129
-      if (content_type == Headers::get().ContentTypeValues.Json &&
-          body_text[body_text.length() - 1] == '\n') {
-        body_text = body_text.substr(0, body_text.length() - 1);
+    if (grpc_status != 0) {
+      if (response_headers->getGrpcStatusValue().empty()) {
+        response_headers->setGrpcStatus(std::to_string(grpc_status));
       }
-      response_trailer->addReferenceKey(LowerCaseString("grpc-message"),
-                                        PercentEncoding::encode(body_text));
-      // response_headers->setGrpcMessage(PercentEncoding::encode(body_text));
+      if (!body_text.empty() && !local_reply_data.is_head_request_) {
+        // TODO(dio): Probably it is worth to consider caching the encoded message based on gRPC
+        // status.
+        // JsonFormatter adds a '\n' at the end. For header value, it should be removed.
+        // https://github.com/envoyproxy/envoy/blob/main/source/common/formatter/substitution_formatter.cc#L129
+        if (content_type == Headers::get().ContentTypeValues.Json &&
+            body_text[body_text.length() - 1] == '\n') {
+          body_text = body_text.substr(0, body_text.length() - 1);
+        }
+        response_headers->setGrpcMessage(PercentEncoding::encode(body_text));
+      }
+    } else {
+      response_trailer = ResponseTrailerMapImpl::create();
+      response_trailer->addReferenceKey(LowerCaseString("grpc-status"),
+                                        std::to_string(grpc_status));
     }
     // The `modify_headers` function may have added content-length, remove it.
     response_headers->removeContentLength();
@@ -757,12 +757,16 @@ void Utility::encodeLocalReply(const bool& is_reset, PreparedLocalReplyPtr prepa
   ResponseHeaderMapPtr response_headers{std::move(prepared_local_reply->response_headers_)};
 
   if (prepared_local_reply->is_grpc_request_) {
-    // Trailers only response
-    prepared_local_reply->encode_headers_(std::move(response_headers), false);
-    Buffer::OwnedImpl buffer(prepared_local_reply->response_body_);
-    prepared_local_reply->encode_data_(buffer, false);
-    ResponseTrailerMapPtr response_tailers{std::move(prepared_local_reply->response_trailers_)};
-    prepared_local_reply->encode_trailers_(std::move(response_tailers));
+    if (prepared_local_reply->response_trailers_ != nullptr) {
+      prepared_local_reply->encode_headers_(std::move(response_headers), false);
+      Buffer::OwnedImpl buffer(prepared_local_reply->response_body_);
+      prepared_local_reply->encode_data_(buffer, false);
+      ResponseTrailerMapPtr response_tailers{std::move(prepared_local_reply->response_trailers_)};
+      prepared_local_reply->encode_trailers_(std::move(response_tailers));
+    } else {
+      // Trailers only response
+      prepared_local_reply->encode_headers_(std::move(response_headers), true);
+    }
     return;
   }
 

@@ -44,7 +44,8 @@ void sendLocalReplyTestHelper(const bool& is_reset, StreamDecoderFilterCallbacks
                                },
                                [&](Buffer::Instance& data, bool end_stream) -> void {
                                  callbacks.encodeData(data, end_stream);
-                               }},
+                               },
+                               nullptr},
       local_reply_data);
 }
 
@@ -1047,7 +1048,7 @@ TEST(HttpUtility, SendLocalGrpcReplyGrpcStatusPreserved) {
                                [&](ResponseHeaderMapPtr&& headers, bool end_stream) -> void {
                                  callbacks.encodeHeaders(std::move(headers), end_stream, "");
                                },
-                               nullptr};
+                               nullptr, nullptr};
   EXPECT_CALL(callbacks, encodeHeaders_(_, true))
       .WillOnce(Invoke([&](const ResponseHeaderMap& headers, bool) -> void {
         EXPECT_EQ(headers.getStatusValue(), "200");

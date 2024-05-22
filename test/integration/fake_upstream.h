@@ -126,7 +126,7 @@ public:
              },
              [&](Buffer::Instance& data, bool end_stream) -> void {
                encoder_.encodeData(data, end_stream);
-             }}),
+             },nullptr}),
         Http::Utility::LocalReplyData({false, code, body, grpc_status, is_head_request}));
   }
 
